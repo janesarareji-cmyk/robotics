@@ -110,13 +110,15 @@ def run_pipeline(
     print(f"\n  Robot : {robot.name}")
     print(f"  DOF   : {len(robot.joints)}")
     print("\n  Joint table:")
-    print(f"    {'Idx':>4}  {'Type':>10}  {'theta_deg':>9}  {'d':>8}  "
-          f"{'a':>8}  {'alpha_deg':>9}  {'Min_deg':>8}  {'Max_deg':>8}")
-    print("    " + "-" * 72)
+    print(f"    {'Idx':>4}  {'Type':>10}  {'theta':>9}  {'d':>8}  "
+          f"{'a':>8}  {'alpha':>9}  {'Min':>8}  {'Max':>8}  {'Variable'}")
+    print("    " + "-" * 82)
     for j in robot.joints:
+        j_type = j.joint_type.lower().strip()
+        var_desc = "theta (deg)" if j_type == "revolute" else "d (mm)"
         print(f"    {j.index:>4}  {j.joint_type:>10}  {j.theta:>9.2f}  "
               f"{j.d:>8.2f}  {j.a:>8.2f}  {j.alpha:>9.2f}  "
-              f"{j.min_limit:>8.2f}  {j.max_limit:>8.2f}")
+              f"{j.min_limit:>8.2f}  {j.max_limit:>8.2f}  [{var_desc}]")
 
     # ── STAGE 2 — DH Parameter Management ────────────────────────────────────
     _header("STAGE 2 — DH Parameter Management  (Module 2)")
@@ -128,20 +130,23 @@ def run_pipeline(
     # ── STAGE 3 — Transformation Engine ───────────────────────────────────────
     _header("STAGE 3 — Transformation Engine  (Module 3)")
 
-    # Override theta in each joint with the demo angle so we can show
-    # the actual matrices at the chosen joint state.
-    demo_joints_overridden = [
-        JointDefinition(
-            j.index, j.joint_type, q,
-            j.d, j.a, j.alpha,
-            j.min_limit, j.max_limit,
+    # Override joint variable (theta for revolute, d for prismatic) with demo state
+    demo_joints_overridden = []
+    for j, q in zip(robot.joints, demo_joint_state):
+        j_type = j.joint_type.lower().strip()
+        theta_val = q if j_type == "revolute" else j.theta
+        d_val = q if j_type == "prismatic" else j.d
+        demo_joints_overridden.append(
+            JointDefinition(
+                j.index, j.joint_type, theta_val,
+                d_val, j.a, j.alpha,
+                j.min_limit, j.max_limit,
+            )
         )
-        for j, q in zip(robot.joints, demo_joint_state)
-    ]
     local_transforms, cumulative_transforms = build_transform_chain(demo_joints_overridden)
 
     print(f"\n  Built {len(local_transforms)} local 4x4 DH transform matrices.")
-    print(f"  Joint values used: {[round(q, 2) for q in demo_joint_state]} degrees\n")
+    print(f"  Joint values used: {[round(q, 2) for q in demo_joint_state]}\n")
     for i, (loc, cum) in enumerate(zip(local_transforms, cumulative_transforms)):
         print(f"  Joint {i} local T:")
         print(_fmt_matrix(loc))

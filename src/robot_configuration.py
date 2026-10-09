@@ -1,7 +1,7 @@
 import numpy as np
 from .models import JointDefinition, RobotDefinition
 
-SUPPORTED_JOINT_TYPES = {"revolute"}
+SUPPORTED_JOINT_TYPES = {"revolute", "prismatic"}
 
 def create_robot_definition(name, joints, base_transform=None, end_effector_transform=None):
     if not name.strip():
@@ -15,8 +15,10 @@ def create_robot_definition(name, joints, base_transform=None, end_effector_tran
             raise ValueError(f"Duplicate joint index: {joint.index}")
         seen.add(joint.index)
 
-        if joint.joint_type not in SUPPORTED_JOINT_TYPES:
+        j_type = joint.joint_type.lower().strip()
+        if j_type not in SUPPORTED_JOINT_TYPES:
             raise ValueError(f"Unsupported joint type: {joint.joint_type}")
+        joint.joint_type = j_type
 
         if joint.min_limit > joint.max_limit:
             raise ValueError(f"Invalid limits for joint {joint.index}.")

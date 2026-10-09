@@ -10,7 +10,15 @@ def forward_kinematics(robot: RobotDefinition, joint_state: JointState) -> FKRes
     chain = []
 
     for joint, q in zip(robot.joints, joint_state.positions):
-        transform = dh_to_transform(q, joint.d, joint.a, joint.alpha)
+        j_type = joint.joint_type.lower().strip()
+        if j_type == "revolute":
+            # Joint variable is theta (rotation about z_{i-1})
+            transform = dh_to_transform(q, joint.d, joint.a, joint.alpha)
+        elif j_type == "prismatic":
+            # Joint variable is d (linear translation along z_{i-1})
+            transform = dh_to_transform(joint.theta, q, joint.a, joint.alpha)
+        else:
+            raise ValueError(f"Unsupported joint type: {joint.joint_type}")
         current = current @ transform
         chain.append(current.copy())
 

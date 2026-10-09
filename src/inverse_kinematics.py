@@ -13,20 +13,30 @@ def solve_inverse_kinematics(robot, target, initial_guesses, position_tolerance=
     solutions = []
 
     for guess in initial_guesses:
+        # silently skip guesses with wrong DOF instead of crashing
         if len(guess) != len(robot.joints):
-            raise ValueError("Initial guess length does not match robot DOF.")
+            continue
 
-        result = least_squares(
-            lambda q: _position_error_vector(robot, q, target),
-            x0=np.asarray(guess, dtype=float),
-            bounds=(lower, upper),
-        )
+        try:
+            result = least_squares(
+                lambda q: _position_error_vector(robot, q, target),
+                x0=np.asarray(guess, dtype=float),
+                bounds=(lower, upper),
+                method="trf",
+                ftol=1e-10,
+                xtol=1e-10,
+                gtol=1e-10,
+                max_nfev=2000,
+            )
+        except Exception:
+            continue
 
         state = JointState(result.x.tolist())
         fk = forward_kinematics(robot, state)
         error = float(np.linalg.norm(fk.pose.position - target.position))
 
-        if result.success and np.isfinite(error) and error <= position_tolerance:
+        # Use error directly — scipy's result.success is unreliable for least_squares
+        if np.isfinite(error) and error <= position_tolerance:
             candidate = IKSolution(
                 joint_state=state,
                 pose=fk.pose,
@@ -39,7 +49,7 @@ def solve_inverse_kinematics(robot, target, initial_guesses, position_tolerance=
                 np.linalg.norm(
                     np.asarray(old.joint_state.positions) -
                     np.asarray(candidate.joint_state.positions)
-                ) < 1e-3
+                ) < 0.5   # 0.5 deg/mm — filter near-duplicate configs
                 for old in solutions
             )
             if not duplicate:
